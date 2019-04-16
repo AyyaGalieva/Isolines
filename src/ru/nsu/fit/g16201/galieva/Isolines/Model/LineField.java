@@ -132,7 +132,7 @@ public class LineField {
         double pos = (f - function.getMin()) / (function.getMax() - function.getMin());
 
         double levelColorCount = levelColors.size() - (interpolationMode ? 1 : 0);
-        int levelColor = Math.max(0, Math.min((int) (pos * levelColorCount), levelColors.size() - 1));
+        int levelColor = Math.max(0, Math.min((int)(pos * levelColorCount), levelColors.size() - 1));
 
         if (!interpolationMode)
             return levelColors.get(levelColor);

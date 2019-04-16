@@ -13,6 +13,7 @@ import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 public class ImagePanel extends JPanel {
     private BufferedImage image;
@@ -28,7 +29,10 @@ public class ImagePanel extends JPanel {
     private boolean drawLineMode;
     private boolean showPointsMode;
     private boolean interpolationMode;
+    private boolean exactColorMode;
     private boolean isEnable;
+
+    private static final Color backgroundColor = new Color(255, 255, 255);
 
     private ArrayList<Double> additionalLines = new ArrayList<>();
     private Double additionalLineLevel;
@@ -132,7 +136,17 @@ public class ImagePanel extends JPanel {
                         offset+(int)(((height - (segment[1].y - c))/height)*fieldSizeY));
             }
         }
+    }
 
+    private void drawPoints(double f, Graphics2D graphics2D, LineField lineField){
+        double a = lineField.getA();
+        double b = lineField.getB();
+        double c = lineField.getC();
+        double d = lineField.getD();
+        double width = b - a;
+        double height = d - c;
+
+        Line isoline = lineField.getIsoline(f);
         if (showPointsMode) {
             List<Point2D.Double> points = isoline.getPoints();
             for (Point2D.Double point : points) {
@@ -159,24 +173,59 @@ public class ImagePanel extends JPanel {
         int sizeX = lineField.getGridSizeX();
         int sizeY = lineField.getGridSizeY();
 
-        for (int x = 0; x < fieldSizeX; ++x) {
-            for (int y = 0; y < fieldSizeY; ++y) {
-                double f = function.getValue(new Point2D.Double(a+width*(double)x/fieldSizeX, c+height*(double)(fieldSizeY-y)/fieldSizeY));
-                image.setRGB(x+offset, y+offset, lineField.getColor(f, interpolationMode).getRGB());
+        graphics2D.setColor(lineField.getIsolineColor());
+        graphics2D.drawLine(offset-1, offset-1, offset-1, fieldSizeY+offset+1);
+        graphics2D.drawLine(offset-1, offset-1, fieldSizeX+offset+1, offset-1);
+        graphics2D.drawLine(fieldSizeX+offset+1, offset-1, fieldSizeX+offset+1, fieldSizeY+offset+1);
+        graphics2D.drawLine(offset-1, fieldSizeY+offset+1, fieldSizeX+offset+1, fieldSizeY+offset+1);
+
+        if (exactColorMode) {
+            for (int x = 0; x < fieldSizeX; ++x) {
+                for (int y = 0; y < fieldSizeY; ++y) {
+                    double f = function.getValue(new Point2D.Double(a + width * (double) x / fieldSizeX, c + height * (double) (fieldSizeY - y) / fieldSizeY));
+                    image.setRGB(x + offset, y + offset, lineField.getColor(f, interpolationMode).getRGB());
+                }
             }
         }
 
-        graphics2D.setColor(lineField.getIsolineColor());
         for (int i = 0; i < lineField.getLevelCount(); ++i) {
+            graphics2D.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            if (lineMode) {
+                graphics2D.setColor(lineField.getIsolineColor());
+            } else {
+                graphics2D.setColor(lineField.getColor(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), interpolationMode));
+            }
             drawIsoline(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), graphics2D, lineField);
         }
 
+        if (!exactColorMode) {
+            graphics2D.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            int cellWidth = fieldSizeX / sizeX;
+            int cellHeight = fieldSizeY / sizeY;
+            for (int y = 0; y <= sizeY; ++y) {
+                for (int x = 0; x <= sizeX; ++x) {
+                    double f = function.getValue(new Point2D.Double(a + width * (double) x * cellWidth / fieldSizeX, c + height * (double) (fieldSizeY - y * cellHeight) / fieldSizeY));
+                    graphics2D.setColor(lineField.getColor(f, interpolationMode));
+                    Point seed = new Point(x * cellWidth + offset, y * cellHeight + offset);
+                    if (image.getRGB(seed.x, seed.y) == 0)
+                        spanFilling(seed, graphics2D);
+                }
+            }
+        }
+
+        for (int i = 0; i < lineField.getLevelCount(); ++i) {
+            drawPoints(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), graphics2D, lineField);
+        }
+
+        graphics2D.setColor(lineField.getIsolineColor());
         if (drawLineMode && additionalLineLevel!=null) {
             drawIsoline(additionalLineLevel, graphics2D, lineField);
+            drawPoints(additionalLineLevel, graphics2D, lineField);
         }
 
         for (double level : additionalLines) {
             drawIsoline(level, graphics2D, lineField);
+            drawPoints(level, graphics2D, lineField);
         }
 
         graphics2D.setColor(Color.black);
@@ -217,6 +266,42 @@ public class ImagePanel extends JPanel {
         additionalLineLevel = null;
     }
 
+    private Span defineSpan(Point seed, int color) {
+        int leftX = seed.x;
+        int rightX = seed.x;
+        while ((leftX - 1 > 0)&&(image.getRGB(leftX - 1, seed.y) == color))
+            --leftX;
+        while ((rightX + 1 < image.getWidth())&&(image.getRGB(rightX+1, seed.y)==color))
+            ++rightX;
+        return new Span(seed.y, leftX, rightX);
+    }
+
+    public void spanFilling(Point seed, Graphics2D graphics2D) {
+        int oldColor = image.getRGB(seed.x, seed.y);
+
+        Stack<Span> spans = new Stack<>();
+        spans.push(defineSpan(seed, oldColor));
+
+        while (!spans.empty()) {
+            Span span = spans.pop();
+            graphics2D.drawLine(span.getLeftX(), span.getY(), span.getRightX(), span.getY());
+            searchNextSpan(-1, span, oldColor, spans);
+            searchNextSpan(1, span, oldColor, spans);
+        }
+    }
+
+    private void searchNextSpan(int direction, Span curSpan, int oldColor, Stack<Span> spans) {
+        if ((curSpan.getY() + direction > 0)&&(curSpan.getY() + direction < image.getHeight())) {
+            for (int x = curSpan.getLeftX(); x < curSpan.getRightX(); ++x) {
+                if (image.getRGB(x, curSpan.getY() + direction) == oldColor) {
+                    Span newSpan = defineSpan(new Point(x, curSpan.getY() + direction), oldColor);
+                    spans.push(newSpan);
+                    x = newSpan.getRightX();
+                }
+            }
+        }
+    }
+
     @Override
     protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
@@ -238,6 +323,37 @@ public class ImagePanel extends JPanel {
         graphics.drawImage(image, 0, 0, panelSizeX, panelSizeY, this);
     }
 
+    public class Span {
+        private int y, leftX, rightX;
+
+        public Span(int y, int leftX, int rightX) {
+            this.y = y;
+            this.leftX = leftX;
+            this.rightX = rightX;
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (object instanceof Span) {
+                Span span = (Span)object;
+                return (span.y == y)&&(span.leftX == leftX)&&(span.rightX == rightX);
+            }
+            return false;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getLeftX() {
+            return leftX;
+        }
+
+        public int getRightX() {
+            return rightX;
+        }
+    }
+
     public void setGridMode(boolean gridMode) {
         this.gridMode = gridMode;
     }
@@ -252,6 +368,10 @@ public class ImagePanel extends JPanel {
 
     public void setInterpolationMode(boolean interpolationMode) {
         this.interpolationMode = interpolationMode;
+    }
+
+    public void setExactColorMode(boolean exactColorMode) {
+        this.exactColorMode = exactColorMode;
     }
 
     public void setEnable(boolean enable) {

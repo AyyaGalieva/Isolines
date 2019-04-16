@@ -8,6 +8,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
@@ -43,6 +45,12 @@ public class GUI extends JFrame {
 
         imagePanel = new ImagePanel(model, statusBar);
         add(imagePanel, BorderLayout.CENTER);
+
+        addWindowListener(new WindowAdapter(){
+            public void windowClosing(WindowEvent e){
+                System.exit(0);
+            }
+        });
 
         addButton("Load", "File", "Load line map", true, false,"/resources/load.png", () -> {
             JFileChooser fileChooser = new JFileChooser(System.getProperty("user.dir") + "/test/");
@@ -92,6 +100,11 @@ public class GUI extends JFrame {
 
         addButton("Interpolation", "View", "Apply color interpolation", false, false,"/resources/interpolate.jpg", () -> {
             imagePanel.setInterpolationMode(buttonMap.get("Interpolation").isSelected());
+            imagePanel.repaint();
+        });
+
+        addButton("Show exact color", "View", "Show exact color map", false, false,"/resources/exact.png", () -> {
+            imagePanel.setExactColorMode(buttonMap.get("Show exact color").isSelected());
             imagePanel.repaint();
         });
 
