@@ -179,7 +179,7 @@ public class ImagePanel extends JPanel {
         graphics2D.drawLine(fieldSizeX+offset+1, offset-1, fieldSizeX+offset+1, fieldSizeY+offset+1);
         graphics2D.drawLine(offset-1, fieldSizeY+offset+1, fieldSizeX+offset+1, fieldSizeY+offset+1);
 
-        if (exactColorMode) {
+        if (exactColorMode || interpolationMode) {
             for (int x = 0; x < fieldSizeX; ++x) {
                 for (int y = 0; y < fieldSizeY; ++y) {
                     double f = function.getValue(new Point2D.Double(a + width * (double) x / fieldSizeX, c + height * (double) (fieldSizeY - y) / fieldSizeY));
@@ -205,7 +205,7 @@ public class ImagePanel extends JPanel {
             for (int y = 0; y <= sizeY; ++y) {
                 for (int x = 0; x <= sizeX; ++x) {
                     double f = function.getValue(new Point2D.Double(a + width * (double) x * cellWidth / fieldSizeX, c + height * (double) (fieldSizeY - y * cellHeight) / fieldSizeY));
-                    graphics2D.setColor(lineField.getColor(f, interpolationMode));
+                    graphics2D.setColor(lineField.getColor(f, false));
                     Point seed = new Point(x * cellWidth + offset, y * cellHeight + offset);
                     if (image.getRGB(seed.x, seed.y) == 0)
                         spanFilling(seed, graphics2D);
