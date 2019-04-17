@@ -179,11 +179,45 @@ public class ImagePanel extends JPanel {
         graphics2D.drawLine(fieldSizeX+offset+1, offset-1, fieldSizeX+offset+1, fieldSizeY+offset+1);
         graphics2D.drawLine(offset-1, fieldSizeY+offset+1, fieldSizeX+offset+1, fieldSizeY+offset+1);
 
-        if (exactColorMode || interpolationMode) {
+        if (exactColorMode) {
             for (int x = 0; x < fieldSizeX; ++x) {
                 for (int y = 0; y < fieldSizeY; ++y) {
                     double f = function.getValue(new Point2D.Double(a + width * (double) x / fieldSizeX, c + height * (double) (fieldSizeY - y) / fieldSizeY));
                     image.setRGB(x + offset, y + offset, lineField.getColor(f, interpolationMode).getRGB());
+                }
+            }
+        }
+
+        if (interpolationMode && !exactColorMode) {
+            int gridX = 0;
+            int gridY = 0;
+            int cellWidth = (int)Math.round((double)fieldSizeX / sizeX);
+            int cellHeight = (int)Math.round((double)fieldSizeY / sizeY);
+            double f1 = function.getValue(new Point2D.Double(a, d));
+            double f2 = function.getValue(new Point2D.Double(a+width*(double)cellWidth/fieldSizeX, d));
+            double f3 = function.getValue(new Point2D.Double(a, c + height*(double)(fieldSizeY - cellHeight) / fieldSizeY));
+            double f4 = function.getValue(new Point2D.Double(a+width*(double)cellWidth/fieldSizeX, c + height*(double)(fieldSizeY - cellHeight) / fieldSizeY));
+
+            for (int x = 0; x < fieldSizeX; ++x) {
+                for (int y = 0; y < fieldSizeY; ++y) {
+                    int newGridX = (int)(sizeX*(double)x/fieldSizeX);
+                    int newGridY = (int)(sizeY*(double)y/fieldSizeY);
+                    if (newGridX != gridX || newGridY != gridY) {
+                        f1 = function.getValue(new Point2D.Double(a + width * (double) newGridX*cellWidth / fieldSizeX, c + height * (double)(fieldSizeY - newGridY*cellHeight) / fieldSizeY));
+                        f2 = function.getValue(new Point2D.Double(a + width * (double) (newGridX + 1)*cellWidth / fieldSizeX, c + height * (double)(fieldSizeY - newGridY*cellHeight) / fieldSizeY));
+                        f3 = function.getValue(new Point2D.Double(a + width * (double) newGridX*cellWidth / fieldSizeX, c + height * (double)(fieldSizeY - (newGridY + 1)*cellHeight) / fieldSizeY));
+                        f4 = function.getValue(new Point2D.Double(a + width * (double) (newGridX + 1)*cellWidth / fieldSizeX, c + height * (double)(fieldSizeY - (newGridY + 1)*cellHeight) / fieldSizeY));
+                        gridX = newGridX;
+                        gridY = newGridY;
+                    }
+                    int x1 = gridX*cellWidth;
+                    int x2 = (gridX + 1)*cellWidth;
+                    double fr1 = f3*(double)(x2-x)/(x2-x1) + f4*(double)(x-x1)/(x2-x1);
+                    double fr2 = f1*(double)(x2-x)/(x2-x1) + f2*(double)(x-x1)/(x2-x1);
+                    int y1 = (gridY+1)*cellHeight;
+                    int y2 = gridY*cellHeight;
+                    double fp = fr1*(double)(y2-y)/(y2-y1) + fr2*(double)(y-y1)/(y2-y1);
+                    image.setRGB(x+offset, y+offset, lineField.getColor(fp, interpolationMode).getRGB());
                 }
             }
         }
@@ -198,7 +232,7 @@ public class ImagePanel extends JPanel {
             drawIsoline(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), graphics2D, lineField);
         }
 
-        if (!exactColorMode) {
+        if (!exactColorMode && !interpolationMode) {
             graphics2D.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             int cellWidth = fieldSizeX / sizeX;
             int cellHeight = fieldSizeY / sizeY;
@@ -209,6 +243,17 @@ public class ImagePanel extends JPanel {
                     Point seed = new Point(x * cellWidth + offset, y * cellHeight + offset);
                     if (image.getRGB(seed.x, seed.y) == 0)
                         spanFilling(seed, graphics2D);
+                }
+            }
+
+            for (int x = 0; x < fieldSizeX; ++x) {
+                for (int y = 0; y < fieldSizeY; ++y) {
+                    Point seed = new Point(x + offset, y + offset);
+                    if (image.getRGB(seed.x, seed.y) == 0) {
+                        double f = function.getValue(new Point2D.Double(a + width * (double) x / fieldSizeX, c + height * (double) (fieldSizeY - y) / fieldSizeY));
+                        graphics2D.setColor(lineField.getColor(f, false));
+                        spanFilling(seed, graphics2D);
+                    }
                 }
             }
         }
