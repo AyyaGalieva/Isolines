@@ -128,13 +128,11 @@ public class ImagePanel extends JPanel {
 
         Line isoline = lineField.getIsoline(f);
         List<Point2D.Double[]> segments = isoline.getSegments();
-        if (lineMode) {
-            for (Point2D.Double[] segment : segments) {
-                graphics2D.drawLine(offset+(int)(((segment[0].x - a)/width)*fieldSizeX),
-                        offset+(int)(((height - (segment[0].y - c))/height)*fieldSizeY),
-                        offset+(int)(((segment[1].x - a)/width)*fieldSizeX),
-                        offset+(int)(((height - (segment[1].y - c))/height)*fieldSizeY));
-            }
+        for (Point2D.Double[] segment : segments) {
+            graphics2D.drawLine(offset + (int) (((segment[0].x - a) / width) * fieldSizeX),
+                    offset + (int) (((height - (segment[0].y - c)) / height) * fieldSizeY),
+                    offset + (int) (((segment[1].x - a) / width) * fieldSizeX),
+                    offset + (int) (((height - (segment[1].y - c)) / height) * fieldSizeY));
         }
     }
 
@@ -226,10 +224,13 @@ public class ImagePanel extends JPanel {
             graphics2D.setStroke(new BasicStroke(1, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             if (lineMode) {
                 graphics2D.setColor(lineField.getIsolineColor());
+                drawIsoline(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), graphics2D, lineField);
             } else {
-                graphics2D.setColor(lineField.getColor(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), interpolationMode));
+                if (!interpolationMode) {
+                    graphics2D.setColor(lineField.getColor(function.getMin() + ((double) i / lineField.getLevelCount()) * (function.getMax() - function.getMin()), interpolationMode));
+                    drawIsoline(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), graphics2D, lineField);
+                }
             }
-            drawIsoline(function.getMin() + ((double)i/lineField.getLevelCount())*(function.getMax()-function.getMin()), graphics2D, lineField);
         }
 
         if (!exactColorMode && !interpolationMode) {
@@ -263,14 +264,16 @@ public class ImagePanel extends JPanel {
         }
 
         graphics2D.setColor(lineField.getIsolineColor());
-        if (drawLineMode && additionalLineLevel!=null) {
-            drawIsoline(additionalLineLevel, graphics2D, lineField);
-            drawPoints(additionalLineLevel, graphics2D, lineField);
-        }
+        if (lineMode) {
+            if (drawLineMode && additionalLineLevel != null) {
+                drawIsoline(additionalLineLevel, graphics2D, lineField);
+                drawPoints(additionalLineLevel, graphics2D, lineField);
+            }
 
-        for (double level : additionalLines) {
-            drawIsoline(level, graphics2D, lineField);
-            drawPoints(level, graphics2D, lineField);
+            for (double level : additionalLines) {
+                drawIsoline(level, graphics2D, lineField);
+                drawPoints(level, graphics2D, lineField);
+            }
         }
 
         graphics2D.setColor(Color.black);
